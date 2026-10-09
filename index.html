@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Жизнь в СНГ - Симулятор Перекупа и Работяги</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        /* Mobile double-tap & zoom protection */
+        * {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            font-family: 'Rubik', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .pixel-font {
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border-radius: 4px;
+        }
+
+        /* Portrait Overlay Warning */
+        #portrait-warning {
+            display: none;
+        }
+        @media (orientation: portrait) and (max-width: 768px) {
+            #portrait-warning {
+                display: flex;
+            }
+        }
+
+        /* Location Backgrounds */
+        .bg-location-home {
+            background: linear-gradient(to bottom, rgba(15,23,42,0.7), rgba(15,23,42,0.9)), 
+                        radial-gradient(circle at center, #334155 0%, #0f172a 100%);
+        }
+        .bg-location-factory {
+            background: linear-gradient(to bottom, rgba(30,41,59,0.8), rgba(15,23,42,0.95)), 
+                        repeating-linear-gradient(45deg, #1e293b, #1e293b 10px, #0f172a 10px, #0f172a 20px);
+        }
+        .bg-location-store {
+            background: linear-gradient(to bottom, rgba(16,185,129,0.15), rgba(15,23,42,0.95)),
+                        radial-gradient(circle at top, #065f46 0%, #0f172a 100%);
+        }
+        .bg-location-casino {
+            background: radial-gradient(circle at center, #831843 0%, #4c0519 50%, #0f172a 100%);
+        }
+        .bg-location-car market {
+            background: linear-gradient(to bottom, #1e293b 0%, #0f172a 100%);
+        }
+
+        /* Phone slide animation */
+        .phone-modal {
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .phone-modal.hidden-phone {
+            transform: translateY(120%);
+        }
+
+        /* Slot machine styling */
+        .slot-reel {
+            transition: transform 0.1s ease-linear;
+        }
+    </style>
+</head>
+<body class="select-none bg-slate-900 text-slate-100 flex flex-col justify-between h-screen w-screen overflow-hidden">
+
+    <div id="portrait-warning" class="fixed inset-0 bg-slate-950 z-[100] flex flex-col items-center justify-center p-6 text-center text-amber-400">
+        <i class="fa-solid font-rotate text-5xl mb-4 animate-bounce"></i>
+        <h2 class="text-2xl font-bold mb-2">Поверните устройство</h2>
+        <p class="text-slate-300 text-sm">Для комфортной игры переверните телефон в горизонтальный (альбомный) режим.</p>
+    </div>
+
+    <header class="bg-slate-900/90 backdrop-blur border-b border-slate-700/60 px-4 py-2 flex items-center justify-between z-20 shrink-0">
+        <!-- Player Info & Cash -->
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700">
+                <i class="fa-solid fa-wallet text-emerald-400 text-lg"></i>
+                <div>
+                    <div class="text-[10px] text-slate-400 uppercase font-semibold leading-tight">Баланс</div>
+                    <div id="player-money" class="text-emerald-400 font-extrabold text-sm sm:text-base">0 ₽</div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700">
+                <i class="fa-solid fa-calendar-day text-sky-400 text-lg"></i>
+                <div>
+                    <div class="text-[10px] text-slate-400 uppercase font-semibold leading-tight">День</div>
+                    <div id="game-day" class="text-sky-300 font-bold text-sm">1 (Ср)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Needs Bars (Hunger & Energy) -->
+        <div class="flex items-center gap-3 sm:gap-6">
+            <!-- Hunger Bar -->
+            <div class="w-28 sm:w-36">
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="text-amber-400 font-semibold flex items-center gap-1"><i class="fa-solid fa-drumstick-bite"></i> Сытость</span>
+                    <span id="hunger-text" class="text-slate-300 font-bold">100%</span>
+                </div>
+                <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden border border-slate-700">
+                    <div id="hunger-bar" class="bg-amber-500 h-full transition-all duration-300" style="width: 100%"></div>
+                </div>
+            </div>
+
+            <!-- Energy Bar -->
+            <div class="w-28 sm:w-36">
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="text-indigo-400 font-semibold flex items-center gap-1"><i class="fa-solid fa-bolt"></i> Энергия</span>
+                    <span id="energy-text" class="text-slate-300 font-bold">100%</span>
+                </div>
+                <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden border border-slate-700">
+                    <div id="energy-bar" class="bg-indigo-500 h-full transition-all duration-300" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Action Controls -->
+        <div class="flex items-center gap-2">
+            <button onclick="toggleBackpack()" class="relative p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 text-slate-200 transition">
+                <i class="fa-solid fa-sack-archive text-lg"></i>
+                <span id="backpack-badge" class="hidden absolute -top-1 -right-1 bg-amber-500 text-slate-950 text-[10px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center">0</span>
+            </button>
+            <button onclick="openPhone()" class="relative p-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl border border-sky-400 shadow-lg shadow-sky-900/30 transition">
+                <i class="fa-solid fa-mobile-screen-button text-lg"></i>
+            </button>
+        </div>
+    </header>
+
+    <main id="main-stage" class="relative flex-1 bg-location-home transition-all duration-500 flex flex-col justify-between p-4 overflow-hidden">
+        <!-- Location Header Badge -->
+        <div class="flex justify-between items-start z-10">
+            <div class="bg-slate-900/80 backdrop-blur border border-slate-700 px-4 py-2 rounded-2xl flex items-center gap-3">
+                <div id="location-icon-box" class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-xl">
+                    <i class="fa-solid fa-house"></i>
+                </div>
+                <div>
+                    <h1 id="location-title" class="font-extrabold text-base sm:text-lg text-slate-100">Моя Квартира</h1>
+                    <p id="location-desc" class="text-xs text-slate-400">Уютное съемное жильё</p>
+                </div>
+            </div>
+
+            <!-- Current Car Status Widget -->
+            <div id="current-car-widget" class="bg-slate-900/80 backdrop-blur border border-slate-700 px-3 py-2 rounded-2xl flex items-center gap-3">
+                <i class="fa-solid fa-car text-amber-400 text-xl"></i>
+                <div>
+                    <div class="text-[10px] text-slate-400 font-semibold uppercase">Транспорт</div>
+                    <div id="car-widget-name" class="text-xs font-bold text-slate-200">ВАЗ-2101 «Копейка»</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dynamic Scene Canvas / Interactive Elements Container -->
+        <div id="scene-interactive" class="flex-1 flex items-center justify-center my-2 relative z-10">
+            <!-- Scene content injected dynamically by JS -->
+        </div>
+
+        <!-- Travel Progress Modal Overlay -->
+        <div id="travel-overlay" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur z-50 flex flex-col items-center justify-center p-6 text-center">
+            <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col items-center">
+                <div class="text-4xl text-amber-400 mb-3 animate-bounce">
+                    <i id="travel-icon" class="fa-solid fa-car-side"></i>
+                </div>
+                <h3 id="travel-title" class="text-xl font-bold mb-1">В пути...</h3>
+                <p id="travel-sub" class="text-xs text-slate-400 mb-4">Едем на ВАЗ-2101 в Казино</p>
+                
+                <div class="w-full bg-slate-800 rounded-full h-3 overflow-hidden border border-slate-700 mb-2">
+                    <div id="travel-progress" class="bg-amber-500 h-full w-0 transition-all duration-200"></div>
+                </div>
+                <span id="travel-time-left" class="text-xs font-mono text-slate-400">Осталось: 5 сек</span>
+            </div>
+        </div>
+    </main>
+
+    <nav class="bg-slate-900 border-t border-slate-800 px-3 py-2 z-20 shrink-0">
+        <div class="max-w-5xl mx-auto flex items-center justify-around gap-1 sm:gap-2">
+            <button onclick="travelTo('home')" class="nav-btn flex-1 py-2 px-1 sm:px-3 rounded-xl flex flex-col items-center gap-1 transition bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30" data-loc="home">
+                <i class="fa-solid fa-house text-base"></i>
+                <span class="text-[11px] font-semibold">Дом</span>
+            </button>
+            <button onclick="travelTo('factory')" class="nav-btn flex-1 py-2 px-1 sm:px-3 rounded-xl flex flex-col items-center gap-1 transition text-slate-400 hover:text-slate-200 hover:bg-slate-800/60" data-loc="factory">
+                <i class="fa-solid fa-industry text-base"></i>
+                <span class="text-[11px] font-semibold">Завод</span>
+            </button>
+            <button onclick="travelTo('store')" class="nav-btn flex-1 py-2 px-1 sm:px-3 rounded-xl flex flex-col items-center gap-1 transition text-slate-400 hover:text-slate-200 hover:bg-slate-800/60" data-loc="store">
+                <i class="fa-solid fa-cart-shopping text-base"></i>
+                <span class="text-[11px] font-semibold">Магазин</span>
+            </button>
+            <button onclick="travelTo('market')" class="nav-btn flex-1 py-2 px-1 sm:px-3 rounded-xl flex flex-col items-center gap-1 transition text-slate-400 hover:text-slate-200 hover:bg-slate-800/60" data-loc="market">
+                <i class="fa-solid fa-car-burst text-base"></i>
+                <span class="text-[11px] font-semibold">Авторынок</span>
+            </button>
+            <button onclick="travelTo('casino')" class="nav-btn flex-1 py-2 px-1 sm:px-3 rounded-xl flex flex-col items-center gap-1 transition text-slate-400 hover:text-slate-200 hover:bg-slate-800/60" data-loc="casino">
+                <i class="fa-solid fa-dice text-base"></i>
+                <span class="text-[11px] font-semibold">Казино</span>
+            </button>
+        </div>
+    </nav>
+
+    <div id="phone-modal" class="phone-modal hidden-phone fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+        <!-- Smartphone Container -->
+        <div class="bg-slate-900 border-4 border-slate-700 w-full max-w-sm h-[92vh] max-h-[640px] rounded-[36px] shadow-2xl flex flex-col overflow-hidden relative">
+            <!-- Smartphone Top Bar / Notch -->
+            <div class="bg-slate-950 px-6 py-2 flex justify-between items-center text-[11px] text-slate-400 border-b border-slate-800">
+                <span id="phone-clock">12:00</span>
+                <div class="w-16 h-3 bg-slate-800 rounded-full"></div>
+                <div class="flex items-center gap-1.5">
+                    <i class="fa-solid fa-wifi text-[10px]"></i>
+                    <i class="fa-solid fa-battery-three-quarters text-[10px]"></i>
+                </div>
+            </div>
+
+            <!-- Phone Screen Content -->
+            <div id="phone-screen" class="flex-1 bg-slate-900 overflow-y-auto p-4 flex flex-col">
+                <!-- Main Apps Grid (Default Screen) -->
+                <div id="phone-home-screen" class="flex-1 flex flex-col justify-between">
+                    <div>
+                        <h2 class="text-center font-bold text-slate-200 mb-6 text-sm">Смартфон «Горизонт OS»</h2>
+                        <div class="grid grid-cols-3 gap-4">
+                            <!-- Taxi App -->
+                            <button onclick="openPhoneApp('taxi')" class="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 active:scale-95 transition">
+                                <div class="w-12 h-12 rounded-2xl bg-amber-500 flex items-center justify-center text-slate-950 text-xl font-bold shadow-md">
+                                    <i class="fa-solid fa-taxi"></i>
+                                </div>
+                                <span class="text-xs font-semibold text-slate-200">Такси</span>
+                            </button>
+
+                            <!-- Avito App -->
+                            <button onclick="openPhoneApp('avito')" class="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-sky-500/10 border border-sky-500/30 hover:bg-sky-500/20 active:scale-95 transition">
+                                <div class="w-12 h-12 rounded-2xl bg-sky-500 flex items-center justify-center text-white text-xl font-bold shadow-md">
+                                    <i class="fa-solid fa-shop"></i>
+                                </div>
+                                <span class="text-xs font-semibold text-slate-200">Авито</span>
+                            </button>
+
+                            <!-- Bank App -->
+                            <button onclick="openPhoneApp('bank')" class="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 active:scale-95 transition">
+                                <div class="w-12 h-12 rounded-2xl bg-emerald-600 flex items-center justify-center text-white text-xl font-bold shadow-md">
+                                    <i class="fa-solid fa-building-columns"></i>
+                                </div>
+                                <span class="text-xs font-semibold text-slate-200">Банк</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Daily Motivational Quote -->
+                    <div class="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-3 text-center">
+                        <p class="text-[11px] text-slate-400 italic">"Главное не какая у тебя машина, а куда ты на ней едешь..."</p>
+                    </div>
+                </div>
+
+                <!-- Sub-Apps Containers -->
+                <div id="phone-app-container" class="hidden flex-1 flex flex-col">
+                    <!-- Dynamic App Header -->
+                    <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+                        <button onclick="closePhoneApp()" class="text-slate-400 hover:text-white flex items-center gap-1 text-xs">
+                            <i class="fa-solid fa-chevron-left"></i> Назад
+                        </button>
+                        <h3 id="phone-app-title" class="font-bold text-sm text-slate-200">Название</h3>
+                        <div class="w-6"></div>
+                    </div>
+                    <!-- App Content Body -->
+                    <div id="phone-app-body" class="flex-1 overflow-y-auto"></div>
+                </div>
+            </div>
+
+            <!-- Smartphone Bottom Home Button Bar -->
+            <div class="bg-slate-950 py-2 flex justify-center">
+                <button onclick="closePhone()" class="w-24 h-1 bg-slate-600 hover:bg-slate-400 rounded-full transition"></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="backpack-modal" class="hidden fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 w-full max-w-md rounded-3xl p-5 shadow-2xl flex flex-col gap-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div class="flex items-center gap-2 text-amber-400 font-bold text-lg">
+                    <i class="fa-solid fa-sack-archive"></i>
+                    <span>Ваш Рюкзак</span>
+                </div>
+                <button onclick="toggleBackpack()" class="text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Items List -->
+            <div id="backpack-items-list" class="flex-1 max-h-64 overflow-y-auto flex flex-col gap-2">
+                <!-- Items injected by JS -->
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="fixed bottom-16 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <script>
+        /* GAME STATE DATA */
+        const gameState = {
+            money: 1500,
+            day: 1,
+            hunger: 80,
+            energy: 90,
+            currentLocation: 'home',
+            housing: {
+                id: 'rent_room',
+                name: 'Cъемная комнатушка',
+                rentPrice: 300,
+                daysUntilRent: 30
+            },
+            currentCar: {
+                id: 'vaz2101',
+                name: 'ВАЗ-2101 «Копейка»',
+                speed: 1.0,
+                price: 25000,
+                condition: 70
+            },
+            inventory: [
+                { id: 'doshirak', name: 'Доширак', hunger: 35, energy: 5, icon: 'fa-bowl-rice', type: 'food' }
+            ],
+            fridge: [
+                { id: 'sausage', name: 'Вареная Колбаса', hunger: 40, energy: 10, icon: 'fa-hotdog', type: 'food' }
+            ],
+            avitoListings: [
+                { id: 101, title: 'Старый ВАЗ-2107', price: 38000, type: 'car', carId: 'vaz2107', desc: 'На ходу, немного гнилые пороги.' },
+                { id: 102, title: 'Китайский Энергетик', price: 120, type: 'food', itemId: 'energy', desc: 'Бодрит так, что сердце стучит!' }
+            ]
+        };
+
+        /* CAR CATALOG */
+        const CARS_CATALOG = {
+            'vaz2101': { name: 'ВАЗ-2101 «Копейка»', price: 25000, speed: 1.0, icon: 'fa-car-side' },
+            'vaz2107': { name: 'ВАЗ-2107 «Семёрка»', price: 45000, speed: 1.2, icon: 'fa-car' },
+            'priora': { name: 'Lada Priora', price: 180000, speed: 1.6, icon: 'fa-car-side' },
+            'bmw_e39': { name: 'BMW 5-Series (E39)', price: 420000, speed: 2.2, icon: 'fa-car-rear' },
+            'gelandewagen': { name: 'Mercedes G-Class', price: 1500000, speed: 3.0, icon: 'fa-truck-monster' }
+        };
+
+        /* STORE ITEMS */
+        const STORE_ITEMS = [
+            { id: 'doshirak', name: 'Доширак', price: 65, hunger: 35, energy: 5, icon: 'fa-bowl-rice' },
+            { id: 'bread', name: 'Батон хлеба', price: 40, hunger: 20, energy: 5, icon: 'fa-bread-slice' },
+            { id: 'sausage', name: 'Колбаса вареная', price: 220, hunger: 50, energy: 15, icon: 'fa-hotdog' },
+            { id: 'pelmeni', name: 'Пельмени «Сибирские»', price: 310, hunger: 75, energy: 20, icon: 'fa-utensils' },
+            { id: 'energy', name: 'Энергетик «Flash»', price: 110, hunger: 5, energy: 50, icon: 'fa-bolt' }
+        ];
+
+        /* HOUSING OPTIONS */
+        const HOUSING_OPTIONS = [
+            { id: 'rent_room', name: 'Съемная комната', rent: 400, buyPrice: 0 },
+            { id: 'khrushchevka', name: 'Хрущёвка (1-комн.)', rent: 700, buyPrice: 1200000 },
+            { id: 'panelka', name: 'Квартира в Панельке', rent: 1200, buyPrice: 2800000 },
+            { id: 'modern_apt', name: 'Квартира в Новом ЖК', rent: 2500, buyPrice: 6500000 }
+        ];
+
+        /* INITIALIZATION */
+        window.addEventListener('load', () => {
+            loadSavedGame();
+            updateUI();
+            renderScene();
+            
+            // Game Loop (Needs & Rent decay)
+            setInterval(gameTick, 15000); // Every 15s = 1 game action decay
+            
+            // Realtime Phone Clock
+            setInterval(() => {
+                const now = new Date();
+                const clock = document.getElementById('phone-clock');
+                if (clock) clock.innerText = now.toTimeString().substring(0, 5);
+            }, 1000);
+        });
+
+        /* GAME TICK & MECHANICS */
+        function gameTick() {
+            gameState.hunger = Math.max(0, gameState.hunger - 3);
+            gameState.energy = Math.max(0, gameState.energy - 2);
+
+            if (gameState.hunger <= 0) {
+                showToast('Вы очень голодны! Здоровье ухудшается.', 'error');
+            }
+
+            updateUI();
+            saveGame();
+        }
+
+        function passDay() {
+            gameState.day += 1;
+            gameState.housing.daysUntilRent -= 1;
+
+            if (gameState.housing.daysUntilRent <= 0) {
+                // Rent Due
+                if (gameState.money >= gameState.housing.rentPrice) {
+                    gameState.money -= gameState.housing.rentPrice;
+                    gameState.housing.daysUntilRent = 30;
+                    showToast(`Оплачена аренда жилья: ${gameState.housing.rentPrice} ₽`, 'info');
+                } else {
+                    showToast('У вас нет денег на оплату аренды! Штраф 500 ₽.', 'error');
+                    gameState.money -= 500;
+                    gameState.housing.daysUntilRent = 5;
+                }
+            }
+            updateUI();
+        }
+
+        /* UI UPDATE FUNCTION */
+        function updateUI() {
+            document.getElementById('player-money').innerText = `${gameState.money.toLocaleString()} ₽`;
+            document.getElementById('game-day').innerText = `${gameState.day} дн.`;
+            
+            document.getElementById('hunger-text').innerText = `${gameState.hunger}%`;
+            document.getElementById('hunger-bar').style.width = `${gameState.hunger}%`;
+            
+            document.getElementById('energy-text').innerText = `${gameState.energy}%`;
+            document.getElementById('energy-bar').style.width = `${gameState.energy}%`;
+
+            document.getElementById('car-widget-name').innerText = gameState.currentCar ? gameState.currentCar.name : 'Пешком (Автобус)';
+            
+            const badge = document.getElementById('backpack-badge');
+            if (gameState.inventory.length > 0) {
+                badge.innerText = gameState.inventory.length;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        /* NAVIGATION & LOCATION TRAVEL SYSTEM */
+        function travelTo(targetLocation) {
+            if (gameState.currentLocation === targetLocation) return;
+            if (gameState.energy < 5) {
+                showToast('Вы слишком устали для поездки! Поспите дома.', 'error');
+                return;
+            }
+
+            // Travel Time Calculation (Base 5s to 12s depending on Car)
+            let travelTimeSec = 8;
+            if (gameState.currentCar) {
+                travelTimeSec = Math.max(3, Math.round(10 / gameState.currentCar.speed));
+            }
+
+            const travelOverlay = document.getElementById('travel-overlay');
+            const travelProgress = document.getElementById('travel-progress');
+            const travelTimeLeft = document.getElementById('travel-time-left');
+            const travelSub = document.getElementById('travel-sub');
+
+            travelSub.innerText = `Едем в ${getLocationName(targetLocation)} на ${gameState.currentCar ? gameState.currentCar.name : 'Автобусе'}`;
+            travelOverlay.classList.remove('hidden');
+            
+            let elapsed = 0;
+            const intervalStep = 200;
+            
+            const interval = setInterval(() => {
+                elapsed += intervalStep / 1000;
+                const progressPct = Math.min(100, (elapsed / travelTimeSec) * 100);
+                travelProgress.style.width = `${progressPct}%`;
+                travelTimeLeft.innerText = `Осталось: ${Math.max(0, Math.ceil(travelTimeSec - elapsed))} сек`;
+
+                if (elapsed >= travelTimeSec) {
+                    clearInterval(interval);
+                    travelOverlay.classList.add('hidden');
+                    
+                    // Consume stats for travel
+                    gameState.energy = Math.max(0, gameState.energy - 3);
+                    gameState.currentLocation = targetLocation;
+                    
+                    // Update Nav Button States
+                    document.querySelectorAll('.nav-btn').forEach(btn => {
+                        if (btn.dataset.loc === targetLocation) {
+                            btn.className = 'nav-btn flex-1 py-2 px-1 sm:px-3 rounded-xl flex flex-col items-center gap-1 transition bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30';
+                        } else {
+                            btn.className = 'nav-btn flex-1 py-2 px-1 sm:px-3 rounded-xl flex flex-col items-center gap-1 transition text-slate-400 hover:text-slate-200 hover:bg-slate-800/60';
+                        }
+                    });
+
+                    renderScene();
+                    updateUI();
+                }
+            }, intervalStep);
+        }
+
+        function getLocationName(loc) {
+            switch(loc) {
+                case 'home': return 'Дом';
+                case 'factory': return 'Завод';
+                case 'store': return 'Магазин';
+                case 'market': return 'Авторынок';
+                case 'casino': return 'Казино';
+            }
+        }
+
+        /* SCENE RENDERING ENGINE */
+        function renderScene() {
+            const stage = document.getElementById('main-stage');
+            const interactive = document.getElementById('scene-interactive');
+            const locTitle = document.getElementById('location-title');
+            const locDesc = document.getElementById('location-desc');
+            const iconBox = document.getElementById('location-icon-box');
+
+            // Reset background classes
+            stage.className = 'relative flex-1 transition-all duration-500 flex flex-col justify-between p-4 overflow-hidden bg-location-' + gameState.currentLocation;
+
+            if (gameState.currentLocation === 'home') {
+                locTitle.innerText = gameState.housing.name;
+                locDesc.innerText = `Аренда: ${gameState.housing.rentPrice} ₽ / мес. (Осталось ${gameState.housing.daysUntilRent} дн.)`;
+                iconBox.innerHTML = '<i class="fa-solid fa-house"></i>';
+
+                interactive.innerHTML = `
+                    <div class="flex flex-wrap items-center justify-center gap-6 w-full max-w-xl">
+                        <!-- Fridge Interactive -->
+                        <button onclick="openFridgeModal()" class="group flex flex-col items-center p-5 rounded-3xl bg-slate-800/80 border border-slate-700 hover:border-amber-500/50 hover:bg-slate-800 transition shadow-xl">
+                            <div class="w-20 h-24 bg-slate-700 rounded-2xl flex flex-col items-center justify-between p-2 mb-2 group-hover:scale-105 transition border-2 border-slate-600">
+                                <div class="w-full h-1 bg-slate-500 rounded"></div>
+                                <i class="fa-solid fa-kitchen-set text-3xl text-sky-400"></i>
+                                <div class="w-3 h-3 bg-amber-400 rounded-full self-end"></div>
+                            </div>
+                            <span class="text-sm font-bold text-slate-200">Холодильник</span>
+                            <span class="text-[10px] text-slate-400">Продукты: ${gameState.fridge.length} шт.</span>
+                        </button>
+
+                        <!-- Bed / Rest Interactive -->
+                        <button onclick="sleepRest()" class="group flex flex-col items-center p-5 rounded-3xl bg-slate-800/80 border border-slate-700 hover:border-indigo-500/50 hover:bg-slate-800 transition shadow-xl">
+                            <div class="w-20 h-24 bg-slate-700 rounded-2xl flex items-center justify-center mb-2 group-hover:scale-105 transition border-2 border-slate-600">
+                                <i class="fa-solid fa-bed text-4xl text-indigo-400"></i>
+                            </div>
+                            <span class="text-sm font-bold text-slate-200">Отдохнуть (Сон)</span>
+                            <span class="text-[10px] text-slate-400">+100% Энергии (+1 День)</span>
+                        </button>
+                    </div>
+                `;
+            } 
+            else if (gameState.currentLocation === 'factory') {
+                locTitle.innerText = 'Завод «Красный Пролетарий»';
+                locDesc.innerText = 'Цех №4. Смена за станком или работа грузчиком.';
+                iconBox.innerHTML = '<i class="fa-solid fa-industry"></i>';
+
+                interactive.innerHTML = `
+                    <div class="flex flex-col items-center gap-4 w-full max-w-md">
+                        <!-- Factory Machine Work -->
+                        <div class="bg-slate-900/90 border border-slate-700 rounded-3xl p-5 w-full flex flex-col items-center text-center shadow-xl">
+                            <div class="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 text-3xl mb-3">
+                                <i class="fa-solid fa-gears"></i>
+                            </div>
+                            <h3 class="font-bold text-lg text-slate-200 mb-1">Токарный Станок CNC-2000</h3>
+                            <p class="text-xs text-slate-400 mb-4">Нажимайте вовремя кнопки для изготовления деталей</p>
+                            
+                            <button onclick="startFactoryWork()" class="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold rounded-2xl shadow-lg transition active:scale-95">
+                                Работать Смену (-20 Энергии, +800 ₽)
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+            else if (gameState.currentLocation === 'store') {
+                locTitle.innerText = 'Супермаркет «Пятёрочка»';
+                locDesc.innerText = 'Свежие продукты и напитки на каждый день.';
+                iconBox.innerHTML = '<i class="fa-solid fa-cart-shopping"></i>';
+
+                let itemsHTML = STORE_ITEMS.map(item => `
+                    <div class="bg-slate-800/80 border border-slate-700/80 p-3 rounded-2xl flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-slate-700 flex items-center justify-center text-amber-400 text-lg">
+                                <i class="fa-solid ${item.icon}"></i>
+                            </div>
+                            <div>
+                                <div class="font-bold text-xs sm:text-sm text-slate-200">${item.name}</div>
+                                <div class="text-[10px] text-slate-400">+${item.hunger}% Сытости, +${item.energy}% Энергии</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-extrabold text-xs text-emerald-400">${item.price} ₽</span>
+                            <button onclick="buyStoreItem('${item.id}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition">Купить</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                interactive.innerHTML = `
+                    <div class="w-full max-w-lg flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
+                        ${itemsHTML}
+                    </div>
+                `;
+            }
+            else if (gameState.currentLocation === 'market') {
+                locTitle.innerText = 'Городской Авторынок';
+                locDesc.innerText = 'Покупка б/у автомобилей от владельцев.';
+                iconBox.innerHTML = '<i class="fa-solid fa-car-burst"></i>';
+
+                let carsHTML = Object.keys(CARS_CATALOG).map(key => {
+                    const car = CARS_CATALOG[key];
+                    const isOwned = gameState.currentCar && gameState.currentCar.id === key;
+                    return `
+                        <div class="bg-slate-800/80 border border-slate-700 p-3 rounded-2xl flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-12 h-12 rounded-2xl bg-slate-700 flex items-center justify-center text-sky-400 text-2xl">
+                                    <i class="fa-solid ${car.icon}"></i>
+                                </div>
+                                <div>
+                                    <div class="font-bold text-sm text-slate-200">${car.name}</div>
+                                    <div class="text-[10px] text-slate-400">Скорость: x${car.speed}</div>
+                                </div>
+                            </div>
+                            <div>
+                                ${isOwned ? `<span class="px-3 py-1 bg-sky-500/20 text-sky-400 border border-sky-500/40 rounded-xl text-xs font-bold">В наличии</span>` :
+                                `<button onclick="buyCar('${key}')" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold">${car.price.toLocaleString()} ₽</button>`}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                interactive.innerHTML = `
+                    <div class="w-full max-w-lg flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
+                        ${carsHTML}
+                    </div>
+                `;
+            }
+            else if (gameState.currentLocation === 'casino') {
+                locTitle.innerText = 'Казино «Вулкан»';
+                locDesc.innerText = 'Испытай свою удачу на игровом автомате.';
+                iconBox.innerHTML = '<i class="fa-solid fa-dice"></i>';
+
+                interactive.innerHTML = `
+                    <div class="bg-slate-900/90 border-2 border-pink-500/40 rounded-3xl p-5 w-full max-w-sm flex flex-col items-center shadow-2xl">
+                        <h3 class="font-extrabold text-pink-400 text-lg mb-3 tracking-wide">SLOT MACHINE 777</h3>
+                        
+                        <!-- Reels Display -->
+                        <div class="flex items-center gap-2 bg-slate-950 p-3 rounded-2xl border border-slate-800 mb-4">
+                            <div id="reel-1" class="w-16 h-20 bg-slate-800 border border-slate-700 rounded-xl flex items-center justify-center text-3xl">7</div>
+                            <div id="reel-2" class="w-16 h-20 bg-slate-800 border border-slate-700 rounded-xl flex items-center justify-center text-3xl">7</div>
+                            <div id="reel-3" class="w-16 h-20 bg-slate-800 border border-slate-700 rounded-xl flex items-center justify-center text-3xl">7</div>
+                        </div>
+
+                        <!-- Bet Selector & Spin -->
+                        <div class="w-full flex items-center justify-between gap-2 mb-3">
+                            <button onclick="changeCasinoBet(-100)" class="px-3 py-1 bg-slate-800 text-slate-300 font-bold rounded-xl">-100</button>
+                            <span id="casino-bet-val" class="font-extrabold text-amber-400 text-sm">Ставка: 200 ₽</span>
+                            <button onclick="changeCasinoBet(100)" class="px-3 py-1 bg-slate-800 text-slate-300 font-bold rounded-xl">+100</button>
+                        </div>
+
+                        <button onclick="spinSlots()" class="w-full py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-extrabold rounded-2xl shadow-lg transition active:scale-95">
+                            КРУТИТЬ СЛОТЫ
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        /* ACTIONS & WORK MECHANICS */
+        function sleepRest() {
+            gameState.energy = 100;
+            gameState.hunger = Math.max(10, gameState.hunger - 25);
+            passDay();
+            showToast('Вы отлично выспались! Энергия 100%.', 'success');
+            renderScene();
+        }
+
+        function startFactoryWork() {
+            if (gameState.energy < 20) {
+                showToast('Недостаточно энергии для работы!', 'error');
+                return;
+            }
+            gameState.energy -= 20;
+            gameState.hunger = Math.max(0, gameState.hunger - 15);
+            
+            const pay = 800 + Math.floor(Math.random() * 300);
+            gameState.money += pay;
+            
+            showToast(`Смена завершена! Вы заработали +${pay} ₽`, 'success');
+            updateUI();
+        }
+
+        function buyStoreItem(itemId) {
+            const item = STORE_ITEMS.find(i => i.id === itemId);
+            if (!item) return;
+
+            if (gameState.money < item.price) {
+                showToast('Недостаточно денег!', 'error');
+                return;
+            }
+
+            gameState.money -= item.price;
+            gameState.inventory.push({ ...item });
+            showToast(`Куплено: ${item.name}`, 'success');
+            updateUI();
+        }
+
+        function buyCar(carKey) {
+            const car = CARS_CATALOG[carKey];
+            if (!car) return;
+
+            if (gameState.money < car.price) {
+                showToast('Недостаточно денег на покупку авто!', 'error');
+                return;
+            }
+
+            gameState.money -= car.price;
+            gameState.currentCar = {
+                id: carKey,
+                name: car.name,
+                speed: car.speed,
+                price: car.price
+            };
+
+            showToast(`Поздравляем с покупкой ${car.name}!`, 'success');
+            renderScene();
+            updateUI();
+        }
+        /* CASINO SLOT MACHINE LOGIC */
+        let currentCasinoBet = 200;
+        function changeCasinoBet(delta) {
+            currentCasinoBet = Math.max(100, currentCasinoBet + delta);
+            const valEl = document.getElementById('casino-bet-val');
+            if (valEl) valEl.innerText = `Ставка: ${currentCasinoBet} ₽`;
+        }
+
+        function spinSlots() {
+            if (gameState.money < currentCasinoBet) {
+                showToast('Недостаточно денег для ставки!', 'error');
+                return;
+            }
+
+            gameState.money -= currentCasinoBet;
+            updateUI();
+
+            const icons = ['🍒', '🍋', '🔔', '💎', '7️⃣'];
+            const r1 = document.getElementById('reel-1');
+            const r2 = document.getElementById('reel-2');
+            const r3 = document.getElementById('reel-3');
+
+            let counter = 0;
+            const spinInterval = setInterval(() => {
+                r1.innerText = icons[Math.floor(Math.random() * icons.length)];
+                r2.innerText = icons[Math.floor(Math.random() * icons.length)];
+                r3.innerText = icons[Math.floor(Math.random() * icons.length)];
+                counter++;
+
+                if (counter > 12) {
+                    clearInterval(spinInterval);
+                    
+                    const res1 = icons[Math.floor(Math.random() * icons.length)];
+                    const res2 = icons[Math.floor(Math.random() * icons.length)];
+                    const res3 = icons[Math.floor(Math.random() * icons.length)];
+
+                    r1.innerText = res1;
+                    r2.innerText = res2;
+                    r3.innerText = res3;
+
+                    if (res1 === res2 && res2 === res3) {
+                        const win = currentCasinoBet * 10;
